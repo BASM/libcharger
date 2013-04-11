@@ -20,27 +20,37 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
+
+#include <math.h>
 
 #include <charger.h>
+#include "getch.h"
 
 typedef struct {
   int cap;
   int volt;
-  int extvolt;
-  int resitor;
+  int res;
   int temp;
+  
+  int capmax;
+  int extvolt;
+  int extres;
 
 } battary;
 
+static void batt_cap2volt(battary* b);
+
+
 int batt_tick(battary* b, int seconds)
 {
-
+  batt_cap2volt(b);
   return 0;
 }
 
 int batt_printinfo(battary* b)
 {
-  printf("v1: %i, v2: %i, cur: %i, vint: %i cap: %i\n", b->extvolt, b->extvolt, 0, b->volt, b->cap);
+  printf("v1: %i, v2: %i, extres: %i, cur: %i, vint: %i cap: %i, capfull: %i\n", b->extvolt, b->extvolt, b->extres, 0, b->volt, b->cap, b->capmax);
 
   return 0;
 }
@@ -52,6 +62,31 @@ int batt_setvolt(battary* bat, int volt, int res)
   return 0;
 }
 
+static void batt_cap2volt(battary* b)
+{
+  float cap=b->cap*15/2700.0;
+  double res = (1.0/400.0)*pow((cap-7.8),3)+1.25;
+
+  b->volt=res*100;
+}
+
+int batt_init(battary* b)
+{
+  b->extres=0xffff;
+  b->capmax=2700;
+  b->cap=1000;
+  batt_cap2volt(b);
+  return 0;
+}
+
+
+static int usage() 
+{
+  printf("Usage:\n");
+  printf(" ? -- this help message\n");
+  return 0;
+}
+
 int main(void)
 {
   printf("Init charger...\n");
@@ -59,14 +94,29 @@ int main(void)
   battary cbat={0};
   battary* bat=&cbat;
 
-  int second;
+  //int second;
 
+  batt_init(bat);
+
+  int iter=0;
   while(1)
   {
-    batt_tick(bat, 10);
-    batt_printinfo(bat);
+    int key = trych();
 
-    sleep(1);
+    if(key!=0){
+      switch(key) {
+        case '?': usage(); break;
+        case 'c': bat->cap+=100; break;
+        case 'C': bat->cap-=100; break;
+      }
+    }
+    if ((iter++%100)==0) {
+      printf("Time: %i second: ", iter/100);
+      batt_printinfo(bat);
+
+      batt_tick(bat, 10);
+    }
+    usleep(10000);
   }
 
   return 0;
